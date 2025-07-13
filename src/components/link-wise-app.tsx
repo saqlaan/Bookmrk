@@ -22,10 +22,26 @@ import type { Category, Resource } from '@/lib/types';
 import { ResourceCard } from './resource-card';
 import { AddResourceDialog } from './add-resource-dialog';
 import { ManageCategoriesDialog } from './manage-categories-dialog';
-import { Bookmark, Plus, Search, Settings, Tag } from 'lucide-react';
+import { Bookmark, Plus, Search, Settings, Tag, LogOut, User as UserIcon } from 'lucide-react';
+import { useAuth } from './auth-wrapper';
+import { clientSignOut } from '@/lib/auth-actions';
+import { useRouter } from 'next/navigation';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
 
 export function LinkWiseApp() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const router = useRouter();
+  
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [resources, setResources] = useState<Resource[]>(initialResources);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -93,6 +109,15 @@ export function LinkWiseApp() {
       toast({ title: 'Success', description: 'Category status updated.' });
   }, [toast]);
 
+  const handleSignOut = async () => {
+    const error = await clientSignOut();
+    if (error) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message });
+    } else {
+        router.push('/login');
+    }
+  };
+
   const currentCategoryName = useMemo(() => {
     if (selectedCategoryId === null) return 'All Resources';
     return categories.find(c => c.id === selectedCategoryId)?.name || 'All Resources';
@@ -103,11 +128,42 @@ export function LinkWiseApp() {
     <SidebarProvider>
       <Sidebar>
         <SidebarHeader>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
-                <Bookmark className="h-5 w-5 text-primary" />
-            </Button>
-            <h1 className="text-lg font-semibold tracking-tight font-headline">LinkWise</h1>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+                    <Bookmark className="h-5 w-5 text-primary" />
+                </Button>
+                <h1 className="text-lg font-semibold tracking-tight font-headline">LinkWise</h1>
+            </div>
+            {user && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={user.photoURL ?? ''} alt={user.displayName ?? 'User'} />
+                      <AvatarFallback>
+                        {user.displayName ? user.displayName.charAt(0).toUpperCase() : <UserIcon className="h-4 w-4" />}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{user.displayName ?? 'User'}</p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        {user.email}
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Log out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </SidebarHeader>
         <SidebarContent>
