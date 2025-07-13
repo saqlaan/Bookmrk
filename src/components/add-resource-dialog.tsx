@@ -31,8 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { Category, Resource } from '@/lib/types';
-import { Sparkles } from 'lucide-react';
-import { summarizeUrl } from '@/ai/flows/summarize-url-flow';
+
 import { useToast } from '@/hooks/use-toast';
 
 const urlSchema = z.string().url({ message: 'Please enter a valid URL.' });
@@ -97,11 +96,11 @@ export function AddResourceDialog({
 
     setIsGenerating(true);
     try {
-        const summary = await summarizeUrl({ url });
-        if (summary) {
-            form.setValue('title', summary.title, { shouldValidate: true });
-            form.setValue('description', summary.description, { shouldValidate: true });
-        }
+        // const summary = await summarizeUrl({ url });
+        // if (summary) {
+        //     form.setValue('title', summary.title, { shouldValidate: true });
+        //     form.setValue('description', summary.description, { shouldValidate: true });
+        // }
     } catch (error) {
         console.error('Failed to generate summary:', error);
         toast({
@@ -140,10 +139,10 @@ export function AddResourceDialog({
                     <FormControl>
                         <Input placeholder="https://example.com" {...field} />
                     </FormControl>
-                    <Button type="button" variant="outline" size="icon" onClick={handleGenerate} disabled={isGenerating}>
+                    {/* <Button type="button" variant="outline" size="icon" onClick={handleGenerate} disabled={isGenerating}>
                         <Sparkles className={`h-4 w-4 ${isGenerating ? 'animate-spin' : ''}`} />
                         <span className="sr-only">Generate Details</span>
-                    </Button>
+                    </Button> */}
                   </div>
                   <FormMessage />
                 </FormItem>
