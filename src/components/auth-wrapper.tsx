@@ -22,19 +22,15 @@ export const useAuth = () => {
 export function AuthWrapper({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setLoading(false);
-      if (!firebaseUser) {
-        router.push('/login');
-      }
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, []);
 
   if (loading) {
     return (
@@ -46,11 +42,6 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
             </div>
         </div>
     );
-  }
-
-  if (!user) {
-    // This is a fallback while redirecting
-    return null;
   }
 
   return (

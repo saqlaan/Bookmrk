@@ -40,7 +40,7 @@ const urlSchema = z.string().url({ message: 'Please enter a valid URL.' });
 const resourceSchema = z.object({
   title: z.string().min(2, { message: 'Title must be at least 2 characters.' }),
   url: urlSchema,
-  description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
+  description: z.string(),
   categoryId: z.string({ required_error: 'Please select a category.' }),
 });
 

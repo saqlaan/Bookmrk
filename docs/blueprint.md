@@ -1,4 +1,4 @@
-# **App Name**: LinkWise
+# **App Name**: Bookmrk
 
 ## Core Features:
 

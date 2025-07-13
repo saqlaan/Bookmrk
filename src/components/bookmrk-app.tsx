@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   SidebarProvider,
   Sidebar,
@@ -22,7 +22,7 @@ import type { Category, Resource } from '@/lib/types';
 import { ResourceCard } from './resource-card';
 import { AddResourceDialog } from './add-resource-dialog';
 import { ManageCategoriesDialog } from './manage-categories-dialog';
-import { Bookmark, Plus, Search, Settings, Tag, LogOut, User as UserIcon } from 'lucide-react';
+import { Bookmark, Plus, Search, Settings, Tag, LogOut, User as UserIcon, Loader2, X } from 'lucide-react';
 import { useAuth } from './auth-wrapper';
 import { clientSignOut } from '@/lib/auth-actions';
 import { useRouter } from 'next/navigation';
@@ -35,21 +35,91 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  addCategory,
+  getCategories,
+  updateCategory,
+  deleteCategory,
+  addResource,
+  getResources,
+  updateResource,
+  deleteResource
+} from '@/lib/firebase-db';
+import { useDebouncedCallback } from 'use-debounce';
 
 
-export function LinkWiseApp() {
+export function BookmrkApp() {
   const { toast } = useToast();
   const { user } = useAuth();
   const router = useRouter();
   
-  const [categories, setCategories] = useState<Category[]>(initialCategories);
-  const [resources, setResources] = useState<Resource[]>(initialResources);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [resources, setResources] = useState<Resource[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   
   const [isAddResourceOpen, setAddResourceOpen] = useState(false);
   const [isManageCategoriesOpen, setManageCategoriesOpen] = useState(false);
   const [resourceToEdit, setResourceToEdit] = useState<Resource | null>(null);
+
+  // Debounce search term updates
+  const debouncedSetSearch = useDebouncedCallback((value: string) => {
+    setDebouncedSearchTerm(value);
+  }, 300);
+
+  // Update debounced search when searchTerm changes
+  useEffect(() => {
+    debouncedSetSearch(searchTerm);
+  }, [searchTerm, debouncedSetSearch]);
+
+  useEffect(() => {
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+  }, [user, router]);
+
+  // Load initial data
+  useEffect(() => {
+    async function loadData() {
+      if (!user) return;
+      
+      try {
+        setIsLoading(true);
+        console.log('Loading data for user:', user.uid);
+        
+        const [loadedCategories, loadedResources] = await Promise.all([
+          getCategories(user.uid),
+          getResources(user.uid)
+        ]);
+        
+        console.log('Loaded categories:', loadedCategories);
+        console.log('Loaded resources:', loadedResources);
+        
+        setCategories(loadedCategories);
+        setResources(loadedResources);
+      } catch (error) {
+        console.error('Error loading data:', error);
+        // Log more details about the error
+        if (error instanceof Error) {
+          console.error('Error name:', error.name);
+          console.error('Error message:', error.message);
+          console.error('Error stack:', error.stack);
+        }
+        toast({ 
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to load your data. Please try again.'
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadData();
+  }, [user, toast]);
 
   const filteredResources = useMemo(() => {
     return resources
@@ -57,57 +127,124 @@ export function LinkWiseApp() {
         selectedCategoryId === null || resource.categoryId === selectedCategoryId
       )
       .filter((resource) => {
-        const term = searchTerm.toLowerCase();
-        return (
-          resource.title.toLowerCase().includes(term) ||
-          resource.description.toLowerCase().includes(term) ||
-          resource.url.toLowerCase().includes(term)
-        );
+        if (!debouncedSearchTerm) return true;
+        
+        const terms = debouncedSearchTerm.toLowerCase().split(' ').filter(Boolean);
+        if (terms.length === 0) return true;
+
+        const searchableText = [
+          resource.title,
+          resource.description,
+          resource.url,
+          categories.find(c => c.id === resource.categoryId)?.name || ''
+        ].join(' ').toLowerCase();
+
+        // Match all terms (AND search)
+        return terms.every(term => searchableText.includes(term));
       });
-  }, [resources, selectedCategoryId, searchTerm]);
+  }, [resources, selectedCategoryId, debouncedSearchTerm, categories]);
 
   const handleEditResource = useCallback((resource: Resource) => {
     setResourceToEdit(resource);
     setAddResourceOpen(true);
   }, []);
 
-  const handleDeleteResource = useCallback((id: string) => {
-    setResources((prev) => prev.filter((r) => r.id !== id));
-    toast({ title: 'Success', description: 'Resource deleted successfully.' });
-  }, [toast]);
+  const handleDeleteResource = useCallback(async (id: string) => {
+    if (!user) return;
+    
+    try {
+      await deleteResource(user.uid, id);
+      setResources((prev) => prev.filter((r) => r.id !== id));
+      toast({ title: 'Success', description: 'Resource deleted successfully.' });
+    } catch (error) {
+      console.error('Error deleting resource:', error);
+      toast({ 
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to delete resource. Please try again.'
+      });
+    }
+  }, [user, toast]);
 
-  const handleSaveResource = useCallback((data: Omit<Resource, 'id'>, id?: string) => {
+  const handleSaveResource = useCallback(async (data: Omit<Resource, 'id'>, id?: string) => {
+    if (!user) return;
+
+    try {
+      console.log('Saving resource:', { data, id, userId: user.uid });
+      
       if (id) {
+        const updatedResource = { ...data, id } as Resource;
+        await updateResource(user.uid, updatedResource);
         setResources((prev) =>
-          prev.map((r) => (r.id === id ? { ...r, ...data } : r))
+          prev.map((r) => (r.id === id ? updatedResource : r))
         );
         toast({ title: 'Success', description: 'Resource updated successfully.' });
       } else {
-        setResources((prev) => [
-          ...prev,
-          { ...data, id: crypto.randomUUID() },
-        ]);
+        const newResource = { ...data, id: crypto.randomUUID() } as Resource;
+        await addResource(user.uid, newResource);
+        setResources((prev) => [...prev, newResource]);
         toast({ title: 'Success', description: 'Resource added successfully.' });
       }
-    }, [toast]
-  );
-
-  const handleAddCategory = useCallback((name: string) => {
-      if (categories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
-          toast({ variant: 'destructive', title: 'Error', description: 'Category already exists.' });
-          return;
+    } catch (error) {
+      console.error('Error saving resource:', error);
+      if (error instanceof Error) {
+        console.error('Error name:', error.name);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
       }
+      toast({ 
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to save resource. Please try again.'
+      });
+    }
+  }, [user, toast]);
+
+  const handleAddCategory = useCallback(async (name: string) => {
+    if (!user) return;
+
+    if (categories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Category already exists.' });
+      return;
+    }
+
+    try {
       const newCategory: Category = { id: crypto.randomUUID(), name, archived: false };
+      await addCategory(user.uid, newCategory);
       setCategories(prev => [...prev, newCategory]);
       toast({ title: 'Success', description: 'Category added successfully.' });
-  }, [categories, toast]);
+    } catch (error) {
+      console.error('Error adding category:', error);
+      toast({ 
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to add category. Please try again.'
+      });
+    }
+  }, [categories, user, toast]);
 
-  const handleToggleCategoryArchive = useCallback((id: string) => {
+  const handleToggleCategoryArchive = useCallback(async (id: string) => {
+    if (!user) return;
+
+    try {
+      const category = categories.find(c => c.id === id);
+      if (!category) return;
+
+      const updatedCategory = { ...category, archived: !category.archived };
+      await updateCategory(user.uid, updatedCategory);
       setCategories(prev => prev.map(c => 
-          c.id === id ? { ...c, archived: !c.archived } : c
+        c.id === id ? updatedCategory : c
       ));
       toast({ title: 'Success', description: 'Category status updated.' });
-  }, [toast]);
+    } catch (error) {
+      console.error('Error updating category:', error);
+      toast({ 
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to update category. Please try again.'
+      });
+    }
+  }, [categories, user, toast]);
 
   const handleSignOut = async () => {
     const error = await clientSignOut();
@@ -123,6 +260,20 @@ export function LinkWiseApp() {
     return categories.find(c => c.id === selectedCategoryId)?.name || 'All Resources';
   }, [selectedCategoryId, categories]);
 
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading your bookmarks...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <SidebarProvider>
@@ -133,7 +284,7 @@ export function LinkWiseApp() {
                 <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
                     <Bookmark className="h-5 w-5 text-primary" />
                 </Button>
-                <h1 className="text-lg font-semibold tracking-tight font-headline">LinkWise</h1>
+                <h1 className="text-lg font-semibold tracking-tight font-headline">Bookmrk</h1>
             </div>
             {user && (
               <DropdownMenu>
@@ -171,12 +322,27 @@ export function LinkWiseApp() {
                 <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                        placeholder="Search..."
+                        placeholder="Search by title, URL, description..."
                         className="w-full rounded-lg bg-background pl-8"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
+                    {searchTerm && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-2 top-2 h-5 w-5"
+                        onClick={() => setSearchTerm('')}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
                 </div>
+                {debouncedSearchTerm && (
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    Found {filteredResources.length} {filteredResources.length === 1 ? 'result' : 'results'}
+                  </div>
+                )}
             </SidebarGroup>
 
             <SidebarGroup>
