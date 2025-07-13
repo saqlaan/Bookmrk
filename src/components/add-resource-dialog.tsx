@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -31,10 +31,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { Category, Resource } from '@/lib/types';
+import { Sparkles } from 'lucide-react';
+import { summarizeUrl } from '@/ai/flows/summarize-url-flow';
+import { useToast } from '@/hooks/use-toast';
+
+const urlSchema = z.string().url({ message: 'Please enter a valid URL.' });
 
 const resourceSchema = z.object({
   title: z.string().min(2, { message: 'Title must be at least 2 characters.' }),
-  url: z.string().url({ message: 'Please enter a valid URL.' }),
+  url: urlSchema,
   description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
   categoryId: z.string({ required_error: 'Please select a category.' }),
 });
@@ -56,6 +61,9 @@ export function AddResourceDialog({
   resourceToEdit,
   categories,
 }: AddResourceDialogProps) {
+  const [isGenerating, setIsGenerating] = useState(false);
+  const { toast } = useToast();
+
   const form = useForm<ResourceFormValues>({
     resolver: zodResolver(resourceSchema),
     defaultValues: {
@@ -79,6 +87,33 @@ export function AddResourceDialog({
     }
   }, [resourceToEdit, form, isOpen]);
 
+  const handleGenerate = async () => {
+    const url = form.getValues('url');
+    const result = urlSchema.safeParse(url);
+    if (!result.success) {
+        form.setError('url', { type: 'manual', message: 'Please enter a valid URL to generate details.' });
+        return;
+    }
+
+    setIsGenerating(true);
+    try {
+        const summary = await summarizeUrl({ url });
+        if (summary) {
+            form.setValue('title', summary.title, { shouldValidate: true });
+            form.setValue('description', summary.description, { shouldValidate: true });
+        }
+    } catch (error) {
+        console.error('Failed to generate summary:', error);
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Could not generate details for this URL.',
+        });
+    } finally {
+        setIsGenerating(false);
+    }
+  };
+
   const onSubmit = (data: ResourceFormValues) => {
     onSave(data, resourceToEdit?.id);
     onOpenChange(false);
@@ -97,25 +132,31 @@ export function AddResourceDialog({
           <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
             <FormField
               control={form.control}
-              name="title"
+              name="url"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Title</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. Awesome Design Tools" {...field} />
-                  </FormControl>
+                  <FormLabel>URL</FormLabel>
+                  <div className="flex items-center space-x-2">
+                    <FormControl>
+                        <Input placeholder="https://example.com" {...field} />
+                    </FormControl>
+                    <Button type="button" variant="outline" size="icon" onClick={handleGenerate} disabled={isGenerating}>
+                        <Sparkles className={`h-4 w-4 ${isGenerating ? 'animate-spin' : ''}`} />
+                        <span className="sr-only">Generate Details</span>
+                    </Button>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <FormField
               control={form.control}
-              name="url"
+              name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>URL</FormLabel>
+                  <FormLabel>Title</FormLabel>
                   <FormControl>
-                    <Input placeholder="https://example.com" {...field} />
+                    <Input placeholder="e.g. Awesome Design Tools" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -144,7 +185,7 @@ export function AddResourceDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Category</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a category" />
