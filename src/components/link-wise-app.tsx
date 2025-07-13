@@ -81,19 +81,17 @@ export function LinkWiseApp() {
           toast({ variant: 'destructive', title: 'Error', description: 'Category already exists.' });
           return;
       }
-      const newCategory: Category = { id: crypto.randomUUID(), name };
+      const newCategory: Category = { id: crypto.randomUUID(), name, archived: false };
       setCategories(prev => [...prev, newCategory]);
       toast({ title: 'Success', description: 'Category added successfully.' });
   }, [categories, toast]);
 
-  const handleDeleteCategory = useCallback((id: string) => {
-      if (resources.some(r => r.categoryId === id)) {
-          toast({ variant: 'destructive', title: 'Error', description: 'Cannot delete category with resources.' });
-          return;
-      }
-      setCategories(prev => prev.filter(c => c.id !== id));
-      toast({ title: 'Success', description: 'Category deleted successfully.' });
-  }, [resources, toast]);
+  const handleToggleCategoryArchive = useCallback((id: string) => {
+      setCategories(prev => prev.map(c => 
+          c.id === id ? { ...c, archived: !c.archived } : c
+      ));
+      toast({ title: 'Success', description: 'Category status updated.' });
+  }, [toast]);
 
   const currentCategoryName = useMemo(() => {
     if (selectedCategoryId === null) return 'All Resources';
@@ -133,7 +131,7 @@ export function LinkWiseApp() {
                             <span>All Resources</span>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
-                    {categories.map((category) => (
+                    {categories.filter(c => !c.archived).map((category) => (
                     <SidebarMenuItem key={category.id}>
                         <SidebarMenuButton onClick={() => setSelectedCategoryId(category.id)} isActive={selectedCategoryId === category.id}>
                             <Tag className="h-4 w-4" />
@@ -197,7 +195,7 @@ export function LinkWiseApp() {
         onOpenChange={setAddResourceOpen}
         onSave={handleSaveResource}
         resourceToEdit={resourceToEdit}
-        categories={categories}
+        categories={categories.filter(c => !c.archived)}
       />
 
       <ManageCategoriesDialog
@@ -205,7 +203,7 @@ export function LinkWiseApp() {
         onOpenChange={setManageCategoriesOpen}
         categories={categories}
         onAddCategory={handleAddCategory}
-        onDeleteCategory={handleDeleteCategory}
+        onToggleArchiveCategory={handleToggleCategoryArchive}
       />
     </SidebarProvider>
   );

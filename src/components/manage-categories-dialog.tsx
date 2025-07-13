@@ -13,15 +13,16 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { Category } from '@/lib/types';
-import { Trash2, Plus } from 'lucide-react';
+import { Archive, ArchiveRestore, Plus } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
+import { Separator } from './ui/separator';
 
 interface ManageCategoriesDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   categories: Category[];
   onAddCategory: (name: string) => void;
-  onDeleteCategory: (id: string) => void;
+  onToggleArchiveCategory: (id: string) => void;
 }
 
 export function ManageCategoriesDialog({
@@ -29,7 +30,7 @@ export function ManageCategoriesDialog({
   onOpenChange,
   categories,
   onAddCategory,
-  onDeleteCategory,
+  onToggleArchiveCategory,
 }: ManageCategoriesDialogProps) {
   const [newCategoryName, setNewCategoryName] = useState('');
 
@@ -39,6 +40,9 @@ export function ManageCategoriesDialog({
       setNewCategoryName('');
     }
   };
+  
+  const activeCategories = categories.filter(c => !c.archived);
+  const archivedCategories = categories.filter(c => c.archived);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -46,7 +50,7 @@ export function ManageCategoriesDialog({
         <DialogHeader>
           <DialogTitle>Manage Categories</DialogTitle>
           <DialogDescription>
-            Add, edit, or remove categories to keep your links organized.
+            Add new categories, or archive old ones to hide them.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -68,22 +72,43 @@ export function ManageCategoriesDialog({
             </Button>
           </div>
 
-          <ScrollArea className="h-48">
+          <ScrollArea className="h-64">
             <div className="space-y-2 pr-4">
-              {categories.map((category) => (
+              <Label className="text-xs text-muted-foreground">Active</Label>
+              {activeCategories.map((category) => (
                 <div key={category.id} className="flex items-center justify-between rounded-md border p-3">
                   <span className="text-sm">{category.name}</span>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => onDeleteCategory(category.id)}
+                    onClick={() => onToggleArchiveCategory(category.id)}
                     className="h-8 w-8 text-muted-foreground hover:text-destructive"
                   >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Delete {category.name}</span>
+                    <Archive className="h-4 w-4" />
+                    <span className="sr-only">Archive {category.name}</span>
                   </Button>
                 </div>
               ))}
+               {archivedCategories.length > 0 && (
+                 <>
+                    <Separator className="my-4" />
+                    <Label className="text-xs text-muted-foreground">Archived</Label>
+                    {archivedCategories.map((category) => (
+                        <div key={category.id} className="flex items-center justify-between rounded-md border p-3">
+                        <span className="text-sm text-muted-foreground italic">{category.name}</span>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onToggleArchiveCategory(category.id)}
+                            className="h-8 w-8 text-muted-foreground hover:text-primary"
+                        >
+                            <ArchiveRestore className="h-4 w-4" />
+                            <span className="sr-only">Unarchive {category.name}</span>
+                        </Button>
+                        </div>
+                    ))}
+                 </>
+               )}
             </div>
           </ScrollArea>
         </div>

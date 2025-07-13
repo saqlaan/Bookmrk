@@ -1,6 +1,7 @@
 export interface Category {
   id: string;
   name: string;
+  archived?: boolean;
 }
 
 export interface Resource {
