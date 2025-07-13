@@ -2,6 +2,8 @@
 
 A modern bookmark management application built with Next.js, Firebase, and TailwindCSS. Bookmrk allows you to organize your web resources into categories and access them from anywhere, with support for both cloud storage and local-only mode.
 
+Live. https://bookmrk-gamma.vercel.app/login
+
 ## Features
 
 - **Dual Storage Options**
