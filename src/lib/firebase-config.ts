@@ -12,19 +12,6 @@ const requiredEnvVars = [
   'NEXT_PUBLIC_APP_ID'
 ] as const;
 
-console.log(process.env.NEXT_PUBLIC_TEST);
-console.log(process.env.NEXT_PUBLIC_API_KEY);
-
-const missingEnvVars = requiredEnvVars.filter(
-  (envVar) => !process.env[envVar]
-);
-
-if (missingEnvVars.length > 0) {
-  throw new Error(
-    `Missing required environment variables: ${missingEnvVars.join(', ')}\n` +
-    'Please check your .env.local file.'
-  );
-}
 
 // Debug: Log all environment variables (remove in production)
 console.log('Environment Variables:', {
